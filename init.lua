@@ -10,6 +10,7 @@ local require = require
 local tonumber = tonumber
 local type = type
 local pcall = pcall
+local print = print
 
 module "irc"
 
@@ -33,12 +34,14 @@ end
 
 function new(data)
 	local o = {
-		nick = assert(data.nick, "Field 'nick' is required");
-		username = data.username or "lua";
-		realname = data.realname or "Lua owns";
-		nickGenerator = data.nickGenerator or defaultNickGenerator;
-		hooks = {};
-		track_users = true;
+		nick = assert(data.nick, "Field 'nick' is required"),
+		username = data.username or "lua",
+		realname = data.realname or "Lua owns",
+		password = data.password,
+		nickGenerator = data.nickGenerator or defaultNickGenerator,
+		hooks = {},
+		track_users = true,
+		verbose = data.verbose,
 	}
 	assert(checkNick(o.nick), "Erroneous nickname passed to irc.new")
 	return setmetatable(o, meta_preconnect)
@@ -119,17 +122,11 @@ function meta_preconnect:connect(_host, _port)
 	self.socket = s
 	setmetatable(self, meta)
 
-	self:send("CAP REQ multi-prefix")
-
+	self:send("CAP LS")
 	self:invoke("PreRegister", self)
-	self:send("CAP END")
-
-	if password then
-		self:send("PASS %s", password)
-	end
 
 	self:send("NICK %s", self.nick)
-	self:send("USER %s 0 * :%s", self.username, self.realname)
+	self:send("USER %s 0 1 :%s", self.username, self.realname)
 
 	self.channels = {}
 
@@ -157,7 +154,9 @@ end
 
 local function getline(self, errlevel)
 	local line, err = self.socket:receive("*l")
-
+	if line and self.verbose then
+		print('<-- ' .. line)
+	end
 	if not line and err ~= "timeout" and err ~= "wantread" then
 		self:invoke("OnDisconnect", err, true)
 		self:shutdown()

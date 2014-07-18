@@ -3,6 +3,11 @@ local error = error
 local tonumber = tonumber
 local table = table
 
+local seawolf = require 'seawolf'.__build('variable', 'text')
+local print_r, explode = seawolf.variable.print_r, seawolf.text.explode
+local in_array, base64_encode = seawolf.variable.in_array, require 'base64'.encode
+local print = print
+
 module "irc"
 
 handlers = {}
@@ -171,4 +176,30 @@ handlers["ERROR"] = function(o, prefix, message)
 	o:invoke("OnDisconnect", message, true)
 	o:shutdown()
 	error(message, 3)
+end
+
+handlers.CAP = function(o, server, _, subcommand, answer)
+	local capabilities
+	if subcommand == 'LS' then
+		capabilities = explode(' ', answer)
+		if in_array('sasl', capabilities) and in_array('multi-prefix', capabilities) then
+			o:send("CAP REQ :multi-prefix sasl")
+		else
+			if o.password then
+				self:send("PASS %s", o.password)
+			end
+		end
+	elseif subcommand == 'ACK' then
+		capabilities = explode(' ', answer)
+		if in_array('sasl', capabilities) then
+			o:send('AUTHENTICATE PLAIN')
+		end
+	end
+end
+
+handlers.AUTHENTICATE = function(o, _, continue)
+	if continue == '+' then
+		o:send('AUTHENTICATE %s', base64_encode(o.username .. "\0" .. o.username .. "\0" .. o.password))
+		o:send("CAP END")
+	end
 end

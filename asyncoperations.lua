@@ -2,6 +2,7 @@ local table = table
 local assert = assert
 local select = select
 local pairs = pairs
+local print = print
 
 module "irc"
 
@@ -12,6 +13,10 @@ function meta:send(msg, ...)
 		msg = msg:format(...)
 	end
 	self:invoke("OnSend", msg)
+
+	if self.verbose then
+		print('--> ' .. msg)
+	end
 
 	local bytes, err = self.socket:send(msg .. "\r\n")
 
